@@ -11,7 +11,7 @@ class CropAndSave:
     
     def __init__(self,data_split = "train") -> None:
         self.data_split = data_split
-
+        # Change the working directory to the current folder
         if not os.path.exists(self.SOURCE_DATA_PATH):
             raise FileNotFoundError
         if not os.path.exists(self.DESTINATION_DATA_PATH):
