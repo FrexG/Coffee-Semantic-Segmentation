@@ -3,6 +3,7 @@ import os
 import numpy as np
 import cv2 as cv
 import json
+from tqdm import tqdm
 
 class CropAndSave:
     # Initialize data paths
@@ -77,24 +78,24 @@ class CropAndSave:
                 annotation_info = json.load(f)
                 annotation_info
             ## Loop through all the images
-            for i,image in enumerate(self.images):
+            for i,image in enumerate(tqdm(self.images)):
                 image_file = cv.imread(image)
                 annotation_file = cv.imread(self.annotations[i])
                 # Convert image and annotation to RGB
-                image_file = cv.cvtColor(image_file,cv.COLOR_BGR2RGB)
-                annotation_file = cv.cvtColor(annotation_file,cv.COLOR_BGR2RGB)
+                image_file_rgb = cv.cvtColor(image_file,cv.COLOR_BGR2RGB)
+                annotation_file_rgb = cv.cvtColor(annotation_file,cv.COLOR_BGR2RGB)
                 # Separate the leaf mask from the annotation file
-                leaf_mask = cv.inRange(annotation_file,np.array(annotation_info["background"]),np.array(annotation_info["symptom"]))
+                leaf_mask = cv.inRange(annotation_file_rgb,np.array(annotation_info["background"]),np.array(annotation_info["symptom"]))
+                leaf_mask = cv.bitwise_not(leaf_mask)
                 # Get the cropped image
                 cropped_image,cropped_annotation = self.crop(image_file,annotation_file,leaf_mask)
+
                 # Write the cropped image and annotation to the destination
-
-                print(os.path.join(out_image_path,image.split('/')[-1]))
-                print(os.path.join(out_annotation_path,self.annotations[i].split('/')[-1]))
-
                 cv.imwrite(os.path.join(out_image_path,image.split('/')[-1]),cropped_image)
                 cv.imwrite(os.path.join(out_annotation_path,self.annotations[i].split('/')[-1]),cropped_annotation)
-                break
+                # remove the if block below to resize all images
+                if i == 2:
+                    break
 
     def crop(self,image,annotation,mask):
         # find the contours from the mask
@@ -104,9 +105,10 @@ class CropAndSave:
         # get the bounding rectangle of the largest contour
         x,y,w,h = cv.boundingRect(largest_contour)
         # crop the image and the mask
-        image = image[y:y+h,x:x+w]
-        annotation = annotation[y:y+h,x:x+w]
-        return image,annotation
+        image_cropped = image[y:y+h,x:x+w]
+        annotation_cropped = annotation[y:y+h,x:x+w]
+
+        return image_cropped,annotation_cropped
 
 if __name__ == "__main__":
     c = CropAndSave()
