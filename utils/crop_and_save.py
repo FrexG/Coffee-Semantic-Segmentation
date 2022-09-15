@@ -94,8 +94,6 @@ class CropAndSave:
                 cv.imwrite(os.path.join(out_image_path,image.split('/')[-1]),cropped_image)
                 cv.imwrite(os.path.join(out_annotation_path,self.annotations[i].split('/')[-1]),cropped_annotation)
                 # remove the if block below to resize all images
-                if i == 2:
-                    break
 
     def crop(self,image,annotation,mask):
         # find the contours from the mask
@@ -111,6 +109,6 @@ class CropAndSave:
         return image_cropped,annotation_cropped
 
 if __name__ == "__main__":
-    c = CropAndSave()
+    c = CropAndSave("val")
     c.crop_and_save()
 
