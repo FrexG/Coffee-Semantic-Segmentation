@@ -25,14 +25,21 @@ class CoffeeDataset(Dataset):
         mask = cv.imread(mask_path)
         mask = cv.cvtColor(mask,cv.COLOR_BGR2RGB)
         # separate the masks information
-        leaf = cv.inRange(mask,np.array(self.annotation_info["background"]),np.array(self.annotation_info["symptom"]))
+        healthy = cv.inRange(mask,np.array(self.annotation_info["background"]),np.array(self.annotation_info["symptom"]))
         # inverse
-        leaf = cv.bitwise_not(leaf)
+        healthy = cv.bitwise_not(healthy)
+        
         symptom = cv.inRange(mask,np.array(self.annotation_info["background"]),np.array(self.annotation_info["leaf"]))
         symptom = cv.bitwise_not(symptom)
 
+        leaf = healthy + symptom
+
         if self.transform:
             image = self.transform(image)
-            mask = self.transform(mask)
+            #healthy = self.transform(healthy)
+            #mask = self.transform(mask)
+            leaf = self.transform(leaf)
+            #symptom = self.transform(symptom)
 
-        return(image,mask)
+        #return(image,mask)
+        return (image,leaf)

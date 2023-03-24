@@ -1,8 +1,10 @@
 from tqdm import tqdm
 import os
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from datetime import datetime
+
 class TrainModel:
     """ Model Training class
         returns -> None
@@ -15,6 +17,9 @@ class TrainModel:
         `test_data_len`: length of the testing data
         `device`: acceleration device (cpu,cuda or mps)
     """
+    CURRENT_EPOCH = 0
+    CURRENT_VAL_LOSS = float('inf')
+    
     def __init__(self,model,test_loader:DataLoader,train_loader:DataLoader,train_data_len:int,test_data_len:int,device:torch.device=torch.device("cpu")) -> None:
         """ Initialization """
         
@@ -42,6 +47,7 @@ class TrainModel:
         history = {'training_dice_loss':[],'test_dice_loss':[],'epochs':[]}
         # Model to device
         model = self.model.to(self.device)
+        scheduler = ReduceLROnPlateau(optimizer,"min",patience=5)
         for epoch in range(num_epoch):
             # set the model to train mode
 
@@ -94,21 +100,46 @@ class TrainModel:
                     eval_progress_bar.set_description(f"Evaluation")
                     eval_progress_bar.set_postfix(avg_dice_val_loss=round(total_test_dice_loss.data.item() / test_step,4),avg_val_dice_coeff=round(1-(total_test_dice_loss.data.item() / test_step),4))
                     eval_progress_bar.update()
+            scheduler.step(total_test_dice_loss)
             # save history
             history['epochs'].append(epoch)
             history['training_dice_loss'].append(round(total_train_dice_loss.data.item() / train_step,4))
             history['test_dice_loss'].append(round(total_test_dice_loss.data.item() / test_step,4))
 
-            # save model every 5 epochs
-            if (epoch + 1) % 5 == 0:
-                date_postfix = datetime.now().strftime("%Y-%m-%d")
-                model_name = f'unet_coffee_{date_postfix}.pth'
-                save_path = "../weights"
-
-                if not os.path.exists(save_path):
-                    os.mkdir(save_path)
-                else:
-                    print(f"[INFO] Saving model to {os.path.join(save_path,model_name)}")
-                    torch.save(model.state_dict(),os.path.join(save_path,model_name))
+            if self.early_stopping(model,total_test_dice_loss,epoch):
+                # Stop training
+                print(f"[Info] Early Stopping")
+                print(f"Stopped!!")
                 
+                # close tensorboard
+                #self.writer.close()
+        # Release GPU memory
+        print(f"Free GPU ......")
         return model,history
+
+    def early_stopping(self,model,val_loss,epoch,patience=10,min_delta=0.01):
+        """ Helper method for model training early stopping """
+        if val_loss < self.CURRENT_VAL_LOSS and self.CURRENT_VAL_LOSS - val_loss >= min_delta:
+            # Val loss improved -> save model
+            print(f"[Info] Val loss improved from {self.CURRENT_VAL_LOSS} to {val_loss}")
+            self.save_model(model)
+            self.CURRENT_VAL_LOSS = val_loss
+            self.CURRENT_EPOCH = epoch
+            return False
+        if val_loss >= self.CURRENT_VAL_LOSS and epoch - self.CURRENT_EPOCH >= patience:
+            ## Stop training
+            return True
+
+        return False
+
+    def save_model(self,model):
+        date_postfix = datetime.now().strftime("%Y-%m-%d")
+        model_name = f'elunet_healthy_leaf_{date_postfix}.pth'
+        save_path = "../weights/multi_class"
+        
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        else:
+            print(f"[INFO] Saving model to {os.path.join(save_path,model_name)}")
+            torch.save(model.state_dict(),os.path.join(save_path,model_name))
+           
